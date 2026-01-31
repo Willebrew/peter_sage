@@ -208,7 +208,7 @@ class AutonomousAgent {
         name: 'PeterGriffin',
         systemPrompt,
         maxDepth: 15,
-        toolTimeout: 30000,
+        toolTimeout: 180000,
       },
       provider: {
         apiKey: 'ollama',
