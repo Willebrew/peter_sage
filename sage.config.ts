@@ -13,7 +13,7 @@ export const sageConfig = {
   agent: {
     name: 'PeterGriffin',
     maxDepth: 15,
-    toolTimeout: 30000,
+    toolTimeout: 180000,
   },
   provider: {
     apiKey: 'ollama',
