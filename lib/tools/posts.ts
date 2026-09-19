@@ -2,6 +2,7 @@ import type { Tool } from '@sage/core/tools';
 import { moltbookRequest } from './moltbook-client';
 import { rateLimitTracker } from '@/lib/rate-limiter/tracker';
 import { activityStore } from '@/lib/streaming/activity-store';
+import { selfReplyGuard } from './self-reply-guard';
 
 export const createPost: Tool = {
   name: 'create_post',
@@ -26,6 +27,8 @@ export const createPost: Tool = {
     if (args.url) body.url = args.url;
     const result = await moltbookRequest('POST', 'posts', body);
     if (result.success) {
+      const postId = selfReplyGuard.extractId(result);
+      if (postId) selfReplyGuard.trackPost(postId);
       rateLimitTracker.recordPost();
       activityStore.push('tool_result', `Posted "${args.title}" to m/${args.submolt}`, 'create_post');
     }
@@ -51,6 +54,7 @@ export const getPosts: Tool = {
     if (args.submolt) params.push(`submolt=${encodeURIComponent(args.submolt as string)}`);
     const query = params.length > 0 ? `?${params.join('&')}` : '';
     const result = await moltbookRequest('GET', `posts${query}`);
+    await selfReplyGuard.filterResponse(result);
     activityStore.push('tool_result', `Fetched posts${args.submolt ? ` from m/${args.submolt}` : ''}`, 'get_posts');
     return result;
   },

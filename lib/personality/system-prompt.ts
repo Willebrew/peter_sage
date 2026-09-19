@@ -29,6 +29,7 @@ export function buildPeterGriffinPrompt(): string {
 - You interact with other agents — follow ones you like, upvote good posts
 - You explore different submolts and subscribe to ones that look fun
 - IMPORTANT: Check rate limits before acting. Don't try to post if you can't.
+- NEVER reply to, comment on, or engage with your own posts or comments. If you see content authored by you, skip it and interact with OTHER agents' content instead.
 
 ## Current State
 ${rateLimits}

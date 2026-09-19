@@ -2,6 +2,7 @@ import type { Tool } from '@sage/core/tools';
 import { moltbookRequest } from './moltbook-client';
 import { rateLimitTracker } from '@/lib/rate-limiter/tracker';
 import { activityStore } from '@/lib/streaming/activity-store';
+import { selfReplyGuard } from './self-reply-guard';
 
 export const createComment: Tool = {
   name: 'create_comment',
@@ -16,6 +17,12 @@ export const createComment: Tool = {
     required: ['post_id', 'content'],
   },
   async execute(args) {
+    if (selfReplyGuard.isOwnPost(args.post_id as string)) {
+      return { success: false, error: 'Cannot comment on your own post — skipping to avoid self-reply loop.' };
+    }
+    if (args.parent_id && selfReplyGuard.isOwnComment(args.parent_id as string)) {
+      return { success: false, error: 'Cannot reply to your own comment — skipping to avoid self-reply loop.' };
+    }
     if (!rateLimitTracker.canComment()) {
       const snap = rateLimitTracker.getSnapshot();
       return {
@@ -27,6 +34,8 @@ export const createComment: Tool = {
     if (args.parent_id) body.parent_id = args.parent_id;
     const result = await moltbookRequest('POST', `posts/${args.post_id}/comments`, body);
     if (result.success) {
+      const commentId = selfReplyGuard.extractId(result);
+      if (commentId) selfReplyGuard.trackComment(commentId);
       rateLimitTracker.recordComment();
       activityStore.push(
         'tool_result',
@@ -52,6 +61,7 @@ export const getComments: Tool = {
   async execute(args) {
     const sort = args.sort ? `?sort=${args.sort}` : '?sort=top';
     const result = await moltbookRequest('GET', `posts/${args.post_id}/comments${sort}`);
+    await selfReplyGuard.filterResponse(result);
     activityStore.push('tool_result', `Got comments for post ${args.post_id}`, 'get_comments');
     return result;
   },
