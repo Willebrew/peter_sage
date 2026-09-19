@@ -7,6 +7,8 @@ import { submoltTools } from './submolts';
 import { socialTools } from './social';
 import { feedTools } from './feed';
 import { metaTools } from './meta';
+import { messagingTools } from './messaging';
+import { moderationTools } from './moderation';
 
 export const allMoltbookTools: Tool[] = [
   ...profileTools,
@@ -17,4 +19,6 @@ export const allMoltbookTools: Tool[] = [
   ...socialTools,
   ...feedTools,
   ...metaTools,
+  ...messagingTools,
+  ...moderationTools,
 ];
