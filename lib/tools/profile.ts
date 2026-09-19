@@ -1,6 +1,7 @@
 import type { Tool } from '@sage/core/tools';
-import { moltbookRequest } from './moltbook-client';
+import { config } from '@/lib/config';
 import { activityStore } from '@/lib/streaming/activity-store';
+import { moltbookRequest } from './moltbook-client';
 
 export const getMyProfile: Tool = {
   name: 'get_my_profile',
@@ -26,19 +27,19 @@ export const checkClaimStatus: Tool = {
 
 export const updateProfile: Tool = {
   name: 'update_profile',
-  description: 'Update your Moltbook profile bio or display name',
+  description: 'Update your Moltbook profile description and/or metadata',
   parameters: {
     type: 'object',
     properties: {
-      bio: { type: 'string', description: 'New bio text' },
-      display_name: { type: 'string', description: 'New display name' },
+      description: { type: 'string', description: 'New bio/description text' },
+      metadata: { type: 'object', description: 'Additional metadata object' },
     },
   },
   async execute(args) {
     const body: Record<string, unknown> = {};
-    if (args.bio) body.bio = args.bio;
-    if (args.display_name) body.display_name = args.display_name;
-    const result = await moltbookRequest('PUT', 'agents/me', body);
+    if (args.description) body.description = args.description;
+    if (args.metadata) body.metadata = args.metadata;
+    const result = await moltbookRequest('PATCH', 'agents/me', body);
     activityStore.push('tool_result', `Updated profile: ${JSON.stringify(body)}`, 'update_profile');
     return result;
   },
@@ -61,4 +62,58 @@ export const getProfile: Tool = {
   },
 };
 
-export const profileTools = [getMyProfile, checkClaimStatus, updateProfile, getProfile];
+export const uploadAvatar: Tool = {
+  name: 'upload_avatar',
+  description: 'Upload an avatar image for your profile. Max size: 500KB. Formats: JPEG, PNG, GIF, WebP.',
+  parameters: {
+    type: 'object',
+    properties: {
+      file_path: { type: 'string', description: 'Absolute path to the image file' },
+    },
+    required: ['file_path'],
+  },
+  async execute(args) {
+    const fs = await import('fs');
+    const path = await import('path');
+
+    const filePath = args.file_path as string;
+    if (!fs.existsSync(filePath)) {
+      return { success: false, error: `File not found: ${filePath}` };
+    }
+
+    const fileBuffer = fs.readFileSync(filePath);
+    const fileName = path.basename(filePath);
+    const form = new FormData();
+    form.append('file', new Blob([fileBuffer]), fileName);
+
+    const url = `${config.moltbook.baseUrl}/agents/me/avatar`;
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${config.moltbook.apiKey}`,
+    };
+
+    try {
+      const res = await fetch(url, { method: 'POST', headers, body: form });
+      const data = await res.json();
+      activityStore.push('tool_result', `Uploaded avatar from ${filePath}`, 'upload_avatar');
+      return data;
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unknown error uploading avatar',
+      };
+    }
+  },
+};
+
+export const removeAvatar: Tool = {
+  name: 'remove_avatar',
+  description: 'Remove your profile avatar',
+  parameters: { type: 'object', properties: {} },
+  async execute() {
+    const result = await moltbookRequest('DELETE', 'agents/me/avatar');
+    activityStore.push('tool_result', 'Removed avatar', 'remove_avatar');
+    return result;
+  },
+};
+
+export const profileTools = [getMyProfile, checkClaimStatus, updateProfile, getProfile, uploadAvatar, removeAvatar];
